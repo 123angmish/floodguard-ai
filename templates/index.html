@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FloodGuard AI - Community Flood Detection & Emergency Broadcast Network</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="app-wrapper">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="navbar">
+        <div class="brand">
+            <div class="brand-logo">
+                <i class="fa-solid fa-water-ladder"></i>
+            </div>
+            <div class="brand-text">
+                <h1>FloodGuard <span>AI</span></h1>
+                <p>Community Flood Detection & Location Broadcast Network</p>
+            </div>
+        </div>
+
+        <!-- Colony / Location Selector Bar -->
+        <div class="colony-nav-selector">
+            <i class="fa-solid fa-location-dot location-icon"></i>
+            <span class="selector-label">Colony Area:</span>
+            <select id="colony-select" class="colony-dropdown">
+                <option value="ALL">All Colonies (City Overview)</option>
+                <!-- Populated dynamically via API -->
+            </select>
+            <span id="colony-status-pill" class="badge badge-safe">SAFE</span>
+        </div>
+
+        <!-- User Authentication & Action Bar -->
+        <div class="nav-actions">
+            <!-- Citizen Report Button -->
+            <button id="btn-open-report" class="btn btn-danger-action">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Report Flood in Colony
+            </button>
+            
+            <!-- Audio Siren Toggle -->
+            <button id="btn-audio-alarm" class="btn btn-icon" title="Toggle Emergency Siren Sound">
+                <i class="fa-solid fa-volume-xmark"></i>
+            </button>
+            
+            <!-- User Auth Profile / Login Button -->
+            <div id="user-auth-section">
+                <button id="btn-open-login" class="btn btn-secondary">
+                    <i class="fa-solid fa-user-circle"></i> Resident Login
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ACTIVE EMERGENCY BROADCAST BANNER -->
+    <div id="colony-emergency-banner" class="emergency-broadcast-banner hidden">
+        <div class="broadcast-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="broadcast-content">
+            <strong id="broadcast-title">EMERGENCY FLOOD BROADCAST</strong>
+            <span id="broadcast-message">Severe waterlogging reported by resident & confirmed by AI. Avoid low-lying areas.</span>
+        </div>
+        <button id="btn-dismiss-broadcast" class="btn-dismiss">&times;</button>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="dashboard-grid">
+        
+        <!-- LEFT COLUMN: LIVE VIDEO & TELEMETRY -->
+        <section class="video-container-card">
+            <div class="card-header">
+                <div class="title-with-icon">
+                    <i class="fa-solid fa-video"></i>
+                    <h2>Live Hydrodynamic Video Stream</h2>
+                </div>
+                <div class="stream-badge-wrapper">
+                    <span id="fps-badge" class="badge badge-fps">FPS: --</span>
+                    <span id="connection-badge" class="badge badge-online">CONNECTED</span>
+                </div>
+            </div>
+
+            <!-- Video Player Window -->
+            <div class="video-viewport">
+                <img id="stream-img" src="/api/video_feed" alt="Live Flood Stream" class="video-feed" onerror="handleStreamError()">
+                <div id="video-overlay-alert" class="video-alert-overlay">
+                    <div class="alert-pulse">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>CRITICAL FLOOD INUNDATION DETECTED</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stream Control Bar -->
+            <div class="stream-controls">
+                <div class="source-selector">
+                    <span class="control-label">CCTV Feed:</span>
+                    <div class="btn-group">
+                        <button class="btn btn-tab active" data-source="demo">
+                            <i class="fa-solid fa-play"></i> Demo Video (t4.mp4)
+                        </button>
+                        <button class="btn btn-tab" data-source="webcam">
+                            <i class="fa-solid fa-camera"></i> Live Webcam
+                        </button>
+                        <button class="btn btn-tab" data-source="upload" id="btn-trigger-upload">
+                            <i class="fa-solid fa-upload"></i> Upload Video
+                        </button>
+                    </div>
+                    <input type="file" id="video-file-input" accept="video/mp4,video/avi,video/mov,video/mkv" style="display: none;">
+                </div>
+
+                <div class="overlay-toggles">
+                    <span class="control-label">Layers:</span>
+                    <button id="btn-toggle-vectors" class="btn btn-toggle active" title="Show Lucas-Kanade flow vectors">
+                        <i class="fa-solid fa-arrows-split-up-and-left"></i> Flow Vectors
+                    </button>
+                    <button id="btn-toggle-hud" class="btn btn-toggle active" title="Show on-screen telemetry HUD">
+                        <i class="fa-solid fa-display"></i> Telemetry HUD
+                    </button>
+                    <button id="btn-snapshot" class="btn btn-secondary" title="Capture Snapshot">
+                        <i class="fa-solid fa-camera-retro"></i> Snapshot
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN: TELEMETRY & LIVE RISK -->
+        <section class="telemetry-column">
+            
+            <!-- Risk Status Card -->
+            <div class="metric-card status-card">
+                <div class="metric-header">
+                    <span>CURRENT AREA RISK LEVEL</span>
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="status-display">
+                    <h3 id="telemetry-status" class="status-safe">INITIALIZING</h3>
+                    <p id="status-subtext">Deep Learning (MobileNetV2) & Optical Flow active...</p>
+                </div>
+            </div>
+
+            <!-- Dual Metrics Row -->
+            <div class="metrics-row">
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span>FLOOD CONFIDENCE</span>
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <div class="metric-body">
+                        <div class="metric-value-wrap">
+                            <span id="telemetry-confidence" class="metric-value">0.0</span>
+                            <span class="metric-unit">%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="confidence-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="metric-footer">
+                            <span>MobileNetV2 CNN</span>
+                            <span id="raw-pred-text">Raw: --</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span>FLOW VELOCITY</span>
+                        <i class="fa-solid fa-wind"></i>
+                    </div>
+                    <div class="metric-body">
+                        <div class="metric-value-wrap">
+                            <span id="telemetry-velocity" class="metric-value">0.00</span>
+                            <span class="metric-unit">m/s</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="velocity-bar" class="progress-bar-fill velocity-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="metric-footer">
+                            <span>Lucas-Kanade Flow</span>
+                            <span id="velocity-intensity">Motion: Normal</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Overview Grid -->
+            <div class="stats-summary-grid">
+                <div class="stat-mini-card">
+                    <span class="mini-label">Colony Reports</span>
+                    <span id="stat-community-reports" class="mini-val">0</span>
+                </div>
+                <div class="stat-mini-card">
+                    <span class="mini-label">Critical Alerts</span>
+                    <span id="stat-critical-alerts" class="mini-val danger">0</span>
+                </div>
+                <div class="stat-mini-card">
+                    <span class="mini-label">Peak Velocity</span>
+                    <span id="stat-peak-vel" class="mini-val">0.0 m/s</span>
+                </div>
+                <div class="stat-mini-card">
+                    <span class="mini-label">Peak Confidence</span>
+                    <span id="stat-peak-conf" class="mini-val">0.0%</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- FULL WIDTH SECTION: COMMUNITY REPORTS TIMELINE & TELEMETRY CHART -->
+        <section class="community-and-charts-row">
+            
+            <!-- LEFT: Community Resident Flood Feed -->
+            <div class="community-feed-card">
+                <div class="card-header">
+                    <div class="title-with-icon">
+                        <i class="fa-solid fa-users"></i>
+                        <h2>Colony Resident Flood Feed</h2>
+                    </div>
+                    <span class="badge badge-info" id="feed-colony-label">Showing: All Colonies</span>
+                </div>
+
+                <div class="community-reports-grid" id="community-reports-container">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-camera fa-2x"></i>
+                        <p>No community flood reports uploaded for this area yet.<br>Click <strong>"Report Flood in Colony"</strong> to upload a video.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Real-time Live Chart & Incident Logs -->
+            <div class="chart-and-logs-stack">
+                <!-- Live Chart -->
+                <div class="chart-card">
+                    <div class="card-header">
+                        <div class="title-with-icon">
+                            <i class="fa-solid fa-chart-line"></i>
+                            <h2>Live Sensor Telemetry</h2>
+                        </div>
+                        <span class="chart-legend-hint">Sliding Window</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent CCTV Logs -->
+                <div class="logs-card">
+                    <div class="card-header">
+                        <div class="title-with-icon">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <h2>Sensor Alerts</h2>
+                        </div>
+                        <a href="/api/export" class="btn btn-sm btn-secondary" title="Download CSV">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </a>
+                    </div>
+                    <div class="logs-table-container">
+                        <table class="logs-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>Confidence</th>
+                                    <th>Velocity</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body">
+                                <tr><td colspan="4" class="empty-state">No alerts recorded yet.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>FloodGuard AI • Community-Driven Disaster Early Warning & Hydrodynamic Analytics System</p>
+    </footer>
+</div>
+
+<!-- ============================================================== -->
+<!-- 🚨 MODAL: CROWDSOURCED CITIZEN FLOOD REPORT UPLOAD             -->
+<!-- ============================================================== -->
+<div id="report-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="fa-solid fa-cloud-arrow-up text-danger"></i>
+                <h2>Report Flood in Your Colony</h2>
+            </div>
+            <button class="modal-close" data-close="report-modal">&times;</button>
+        </div>
+        
+        <form id="form-upload-report">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Colony / Area <span class="required">*</span></label>
+                    <select id="report-colony-select" name="colony_name" class="form-control" required>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Landmark / Street Name <span class="required">*</span></label>
+                    <input type="text" id="report-landmark" name="landmark" class="form-control" placeholder="e.g. Main Gate 2, Market Road, Near Temple" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Video of Waterlogging / Flood <span class="required">*</span></label>
+                    <div class="file-upload-zone" id="report-dropzone">
+                        <i class="fa-solid fa-video fa-2x"></i>
+                        <span id="upload-file-label">Click or drag & drop video file (.mp4, .mov, .avi)</span>
+                        <input type="file" id="report-video-file" name="file" accept="video/*" class="file-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Your Name (Optional)</label>
+                    <input type="text" id="report-user-name" name="user_name" class="form-control" placeholder="Resident Name">
+                </div>
+
+                <div class="form-group">
+                    <label>Additional Notes / Severity Description</label>
+                    <textarea id="report-description" name="description" class="form-control" rows="2" placeholder="e.g. Water rising rapidly, vehicles stuck near round-about..."></textarea>
+                </div>
+
+                <!-- Verification Progress Indicator (Hidden until submit) -->
+                <div id="ml-verify-progress" class="verify-progress hidden">
+                    <div class="spinner-with-text">
+                        <i class="fa-solid fa-brain fa-spin"></i>
+                        <span>AI Analyzing Video (MobileNetV2 CNN & Flow Velocity)...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" id="btn-submit-report" class="btn btn-danger-action">
+                    <i class="fa-solid fa-bolt"></i> Verify with AI & Broadcast Alert
+                </button>
+                <button type="button" class="btn btn-secondary" data-close="report-modal">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- 👤 MODAL: RESIDENT LOGIN & COLONY REGISTRATION                 -->
+<!-- ============================================================== -->
+<div id="login-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="fa-solid fa-user-shield text-accent"></i>
+                <h2 id="auth-modal-title">Colony Resident Login</h2>
+            </div>
+            <button class="modal-close" data-close="login-modal">&times;</button>
+        </div>
+
+        <div class="modal-tabs">
+            <button class="modal-tab active" id="tab-login" type="button">Login</button>
+            <button class="modal-tab" id="tab-register" type="button">Register as Resident</button>
+        </div>
+
+        <!-- AUTH NOTIFICATION BOX -->
+        <div id="auth-alert-box" class="auth-alert-box hidden"></div>
+
+        <!-- LOGIN FORM -->
+        <form id="form-login">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="login-email" class="form-control" placeholder="yourname@gmail.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" id="btn-submit-login" class="btn btn-accent">Login to Account</button>
+                <button type="button" class="btn btn-secondary" data-close="login-modal">Cancel</button>
+            </div>
+        </form>
+
+        <!-- REGISTER FORM (Hidden by default) -->
+        <form id="form-register" class="hidden">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Full Name <span class="required">*</span></label>
+                    <input type="text" id="reg-name" class="form-control" placeholder="e.g. Angel Mishra" minlength="2" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label>Email Address (Gmail / Official) <span class="required">*</span></label>
+                    <input type="email" id="reg-email" class="form-control" placeholder="e.g. name@gmail.com" required autocomplete="email">
+                    <span id="reg-email-hint" class="input-validation-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>10-Digit Mobile Number (for Emergency Alerts)</label>
+                    <input type="tel" id="reg-phone" class="form-control" placeholder="e.g. 9876543210" pattern="[6-9][0-9]{9}" maxlength="10">
+                    <span id="reg-phone-hint" class="input-validation-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>Select Colony / Area <span class="required">*</span></label>
+                    <select id="reg-colony-select" class="form-control" required>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Or Enter Custom Colony Name</label>
+                    <input type="text" id="reg-custom-colony" class="form-control" placeholder="e.g. Shanti Nagar, Block C">
+                </div>
+                <div class="form-group">
+                    <label>Create Password <span class="required">*</span></label>
+                    <input type="password" id="reg-password" class="form-control" placeholder="Minimum 6 characters" minlength="6" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password <span class="required">*</span></label>
+                    <input type="password" id="reg-confirm-password" class="form-control" placeholder="Re-enter password" minlength="6" required autocomplete="new-password">
+                    <span id="reg-pw-match-hint" class="input-validation-hint"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" id="btn-submit-register" class="btn btn-accent">Create Resident Account</button>
+                <button type="button" class="btn btn-secondary" data-close="login-modal">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- 🎥 MODAL: WATCH RESIDENT FLOOD VIDEO FULLSCREEN / DETAILS      -->
+<!-- ============================================================== -->
+<div id="video-view-modal" class="modal-backdrop hidden">
+    <div class="modal-box modal-video-lg">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="fa-solid fa-play-circle text-danger"></i>
+                <h2 id="modal-video-landmark">Flood Video Details</h2>
+            </div>
+            <button class="modal-close" data-close="video-view-modal" id="btn-close-video-modal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <!-- Full Video Player -->
+            <div class="modal-video-wrapper">
+                <video id="modal-video-player" controls autoplay playsinline class="modal-video-element">
+                    <source id="modal-video-source" src="" type="video/mp4">
+                    Your browser does not support HTML5 video.
+                </video>
+            </div>
+
+            <!-- Report Meta & AI Verification Grid -->
+            <div class="modal-video-meta">
+                <div class="meta-row">
+                    <div class="meta-item">
+                        <span class="meta-label">Colony / Area:</span>
+                        <strong id="modal-video-colony" class="meta-val">--</strong>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Reported By:</span>
+                        <strong id="modal-video-user" class="meta-val">--</strong>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Time:</span>
+                        <span id="modal-video-time" class="meta-val">--</span>
+                    </div>
+                </div>
+
+                <div class="modal-ai-verification-badge-box">
+                    <div class="ai-badge-left">
+                        <span class="ai-tag-label">AUTOMATED AI VERIFICATION</span>
+                        <span id="modal-video-badge" class="badge badge-flood">🚨 VERIFIED FLOOD</span>
+                    </div>
+                    <div class="ai-metrics-right">
+                        <div class="metric-pill">
+                            <span class="label">FLOOD CONFIDENCE:</span>
+                            <span id="modal-video-conf" class="val">--</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="label">FLOW VELOCITY:</span>
+                            <span id="modal-video-vel" class="val">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-desc-box">
+                    <span class="meta-label">Resident Notes:</span>
+                    <p id="modal-video-desc">No additional notes provided.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button id="btn-load-to-stream" class="btn btn-secondary">
+                <i class="fa-solid fa-satellite-dish"></i> Load into Live Stream Analyzer
+            </button>
+            <button type="button" class="btn btn-accent" data-close="video-view-modal">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>

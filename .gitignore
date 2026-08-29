@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables
+.env
+.env.local
+
+# Databases & Runtime Logs
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.log
+
+# Uploads directory (keep directory structure, ignore user videos)
+uploads/*
+!uploads/.gitkeep
+!uploads/thumbnails/
+uploads/thumbnails/*
+!uploads/thumbnails/.gitkeep
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch / Cache
+.pytest_cache/
+.coverage
+htmlcov/
