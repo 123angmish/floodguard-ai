@@ -29,36 +29,36 @@ The system unifies:
 ```mermaid
 graph TD
     subgraph INGESTION ["1. Multi-Source Ingestion Layer"]
-        A1[CCTV Streams] --> SM[StreamManager Background Worker]
-        A2[Webcam Feed] --> SM
-        A3[Citizen Video Uploads] --> RA[Automated Report Analyzer]
+        A1["CCTV Streams"] --> SM["StreamManager Worker"]
+        A2["Webcam Feed"] --> SM
+        A3["Citizen Video Uploads"] --> RA["Automated Report Analyzer"]
     end
 
     subgraph VISION ["2. AI & Computer Vision Engine"]
-        SM --> P1[224x224 RGB Normalization]
-        SM --> P2[Grayscale Temporal Processing]
+        SM --> P1["224x224 RGB Normalization"]
+        SM --> P2["Grayscale Temporal Processing"]
         
-        P1 --> CNN[MobileNetV2 CNN Classifier<br/>Sigmoid Calibrated Confidence]
-        P2 --> OF[Lucas-Kanade Optical Flow<br/>Velocity Measurement m/s]
+        P1 --> CNN["MobileNetV2 CNN Classifier<br/>Sigmoid Calibrated Confidence"]
+        P2 --> OF["Lucas-Kanade Optical Flow<br/>Velocity Measurement (m/s)"]
         
         RA --> CNN
         RA --> OF
     end
 
     subgraph FUSION ["3. Multi-Factor Risk Assessment"]
-        CNN --> RF[Conjunctive Decision Matrix]
+        CNN --> RF["Conjunctive Decision Matrix"]
         OF --> RF
-        RF --> DB[(SQLite DBMS<br/>Users, Colonies, Reports, Alerts)]
+        RF --> DB[("SQLite DBMS<br/>Users, Colonies, Reports, Alerts")]
     end
 
     subgraph DELIVERY ["4. Real-Time Telemetry & Alert Delivery"]
-        RF --> M1[MJPEG Stream Feed<br/>/api/video_feed]
-        RF --> M2[CCTV Telemetry WebSocket<br/>/ws/stream]
-        RF --> M3[Colony-Scoped WebSocket Room<br/>/ws/colony/{colony_name}]
+        RF --> M1["MJPEG Stream Feed<br/>/api/video_feed"]
+        RF --> M2["CCTV Telemetry WebSocket<br/>/ws/stream"]
+        RF --> M3["Colony-Scoped WebSocket Room<br/>/ws/colony/:colony_name"]
     end
 
     subgraph FRONTEND ["5. Glassmorphism UI & Dashboard"]
-        M1 --> UI[Interactive Cyber-Slate Web UI]
+        M1 --> UI["Interactive Cyber-Slate Web UI"]
         M2 --> UI
         M3 --> UI
         DB --> UI
